@@ -9,7 +9,7 @@ This project visualizes a GitHub user's social coding network in interactive 2D 
 * Right-click to remove a node and its downstream connections
 * Node avatars with **image support** (recommended for \~300 nodes max for performance)
 * Highlighting of connected nodes and links
-* Jupyter Notebook to scrape and generate graph data starting from a specified user
+* Jupyter Notebook to scrape and generate graph data starting from a specified user (requires Python Selenium and a user-agent; Firefox was used)
 
 ## Live Demo
 
@@ -53,7 +53,9 @@ Output is saved as `graph-data.json` for visualization.
 
 * `force-graph` and `d3.js` (CDN)
 * Python 3.x
-* Python packages: `requests`, `networkx`, `matplotlib` (install via `pip`)
+* Python packages: `requests`, `networkx`, `matplotlib`, `selenium` (install via `pip`)
+* A web driver compatible with Firefox
+* User-agent string configured in the scraper
 
 ## Notes
 

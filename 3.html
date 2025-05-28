@@ -152,7 +152,7 @@
                             ctx.arc(node.x, node.y, nodeSize * 0.5, 0, 2 * Math.PI, false);
                             ctx.fill();
                         })
-                        .nodeLabel(node => `${node.id}`)
+                        .nodeLabel(node => (typeof node.name !== "string" || node.name.trim().length <= 1) ? node.id : node.name)
                         .nodeVal(node => node.size || 1)
                         .nodeAutoColorBy('depth')
                         .linkSource('source')

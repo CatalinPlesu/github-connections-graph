@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>GitHub Network Graph 3D</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="graph"></div>
+
+    <script type="module">
+        import ForceGraph3D from "https://cdn.jsdelivr.net/npm/3d-force-graph/+esm";
+        import {
+            TextureLoader,
+            SpriteMaterial,
+            Sprite,
+            Color,
+            SRGBColorSpace,
+            Mesh,
+            SphereGeometry,
+            MeshBasicMaterial
+        } from "https://esm.sh/three";
+
+        fetch('graph-data.json')
+            .then(res => res.json())
+            .then(data => {
+                const graphData = JSON.parse(JSON.stringify(data)); // deep clone
+
+                // Preload images for all nodes
+                const imageCache = new Map();
+                const textureLoader = new TextureLoader();
+                const imagePromises = graphData.nodes.map(node => {
+                    if (node.img) {
+                        return new Promise(resolve => {
+                            textureLoader.load(
+                                node.img,
+                                texture => {
+                                    texture.colorSpace = SRGBColorSpace;
+                                    imageCache.set(node.id, texture);
+                                    resolve();
+                                },
+                                undefined,
+                                () => {
+                                    // On error, skip image
+                                    resolve();
+                                }
+                            );
+                        });
+                    }
+                    return Promise.resolve();
+                });
+
+                Promise.all(imagePromises).then(() => {
+                    // Set up highlighting system
+                    const highlightNodes = new Set();
+                    const highlightLinks = new Set();
+                    let hoverNode = null;
+
+                    // Cross-link node objects for neighbor tracking
+                    graphData.links.forEach(link => {
+                        const a = graphData.nodes.find(node => node.id === (link.source.id || link.source));
+                        const b = graphData.nodes.find(node => node.id === (link.target.id || link.target));
+                        if (a && b) {
+                            !a.neighbors && (a.neighbors = []);
+                            !b.neighbors && (b.neighbors = []);
+                            a.neighbors.push(b);
+                            b.neighbors.push(a);
+
+                            !a.links && (a.links = []);
+                            !b.links && (b.links = []);
+                            a.links.push(link);
+                            b.links.push(link);
+                        }
+                    });
+
+                    const Graph = ForceGraph3D()(document.getElementById('graph'))
+                        .graphData(graphData)
+                        .nodeId('id')
+                        .nodeThreeObject(node => {
+                            const nodeSize = node.size || 12;
+                            const texture = imageCache.get(node.id);
+
+                            if (texture) {
+                                const material = new SpriteMaterial({ map: texture, transparent: true });
+                                // Highlight border by tinting the sprite
+                                if (highlightNodes.has(node)) {
+                                    material.color = new Color(node === hoverNode ? 'red' : 'orange');
+                                } else {
+                                    material.color = new Color(0xffffff);
+                                }
+                                const sprite = new Sprite(material);
+                                sprite.scale.set(nodeSize, nodeSize, 1);
+                                return sprite;
+                            } else {
+                                // Fallback: colored sphere
+                                const color = highlightNodes.has(node)
+                                    ? (node === hoverNode ? 'red' : 'orange')
+                                    : (node.color || 'skyblue');
+                                const geometry = new SphereGeometry(nodeSize / 2, 16, 16);
+                                const material = new MeshBasicMaterial({ color });
+                                return new Mesh(geometry, material);
+                            }
+                        })
+                        .nodeLabel(node => (typeof node.name !== "string" || node.name.trim().length <= 1) ? node.id : node.name)
+                        .nodeVal(node => node.size || 1)
+                        .linkSource('source')
+                        .linkTarget('target')
+                        .linkWidth(link => highlightLinks.has(link) ? 5 : 1)
+                        .linkColor(link => highlightLinks.has(link) ? 'orange' : '#999')
+                        .onNodeHover(node => {
+                            highlightNodes.clear();
+                            highlightLinks.clear();
+                            if (node) {
+                                highlightNodes.add(node);
+                                if (node.neighbors) {
+                                    node.neighbors.forEach(neighbor => highlightNodes.add(neighbor));
+                                }
+                                if (node.links) {
+                                    node.links.forEach(link => highlightLinks.add(link));
+                                }
+                            }
+                            hoverNode = node || null;
+                            Graph.nodeThreeObject(Graph.nodeThreeObject()); // Force update
+                        })
+                        .onLinkHover(link => {
+                            highlightNodes.clear();
+                            highlightLinks.clear();
+                            if (link) {
+                                highlightLinks.add(link);
+                                const sourceNode = graphData.nodes.find(n => n.id === (link.source.id || link.source));
+                                const targetNode = graphData.nodes.find(n => n.id === (link.target.id || link.target));
+                                if (sourceNode) highlightNodes.add(sourceNode);
+                                if (targetNode) highlightNodes.add(targetNode);
+                            }
+                            Graph.nodeThreeObject(Graph.nodeThreeObject()); // Force update
+                        })
+                        .onNodeClick(node => {
+                            if (node.url) window.open(node.url, '_blank');
+                        })
+                        .onNodeRightClick((node, event) => {
+                            event.preventDefault?.();
+
+                            const toRemove = new Set();
+                            const visited = new Set();
+
+                            // Recursively collect all downstream nodes
+                            function dfs(currentId) {
+                                if (visited.has(currentId)) return;
+                                visited.add(currentId);
+                                toRemove.add(currentId);
+
+                                graphData.links.forEach(link => {
+                                    if (link.source.id === currentId || link.source === currentId) {
+                                        dfs(link.target.id || link.target);
+                                    }
+                                });
+                            }
+
+                            dfs(node.id);
+
+                            // Filter out nodes to be removed
+                            graphData.nodes = graphData.nodes.filter(n => !toRemove.has(n.id));
+
+                            // Filter out links related to removed nodes
+                            graphData.links = graphData.links.filter(
+                                l => !toRemove.has(l.source?.id || l.source) && !toRemove.has(l.target?.id || l.target)
+                            );
+
+                            // Re-assign new objects to force re-render
+                            Graph.graphData({
+                                nodes: [...graphData.nodes],
+                                links: [...graphData.links]
+                            });
+                        });
+                });
+            });
+    </script>
+</body>
+</html>

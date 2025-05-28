@@ -30,7 +30,7 @@
             .then(res => res.json())
             .then(data => {
                 const graphData = JSON.parse(JSON.stringify(data)); // deep clone
-                
+
                 // Preload images for all nodes
                 const imageCache = new Map();
                 const imagePromises = graphData.nodes.map(node => {
@@ -57,18 +57,18 @@
                     const highlightNodes = new Set();
                     const highlightLinks = new Set();
                     let hoverNode = null;
-                    
+
                     // Cross-link node objects for neighbor tracking
                     graphData.links.forEach(link => {
                         const a = graphData.nodes.find(node => node.id === (link.source.id || link.source));
                         const b = graphData.nodes.find(node => node.id === (link.target.id || link.target));
-                        
+
                         if (a && b) {
                             !a.neighbors && (a.neighbors = []);
                             !b.neighbors && (b.neighbors = []);
                             a.neighbors.push(b);
                             b.neighbors.push(a);
-                            
+
                             !a.links && (a.links = []);
                             !b.links && (b.links = []);
                             a.links.push(link);
@@ -78,7 +78,9 @@
 
                     const Graph = ForceGraph()(document.getElementById('graph'))
                         .graphData(graphData)
-                        .d3Force('link', d3.forceLink().distance(75))
+                        .d3Force('link', d3.forceLink().distance(150))
+                        .d3Force('charge', d3.forceManyBody().strength(-100))
+                        .d3Force('center', d3.forceCenter())
                         .nodeId('id')
                         .nodeCanvasObject((node, ctx, globalScale) => {
                             const label = node.id;
@@ -106,27 +108,27 @@
                             if (img && img.complete) {
                                 const imgSize = nodeSize;
                                 ctx.save();
-                                
+
                                 // Create circular clipping path
                                 ctx.beginPath();
                                 ctx.arc(node.x, node.y, imgSize * 0.5, 0, 2 * Math.PI, false);
                                 ctx.clip();
-                                
+
                                 // Draw image within the circular clip
-                                ctx.drawImage(img, 
-                                    node.x - imgSize * 0.5, 
-                                    node.y - imgSize * 0.5, 
-                                    imgSize, 
+                                ctx.drawImage(img,
+                                    node.x - imgSize * 0.5,
+                                    node.y - imgSize * 0.5,
+                                    imgSize,
                                     imgSize
                                 );
-                                
+
                                 ctx.restore();
-                                
+
                                 // Draw border around the circular image
                                 ctx.beginPath();
                                 ctx.arc(node.x, node.y, imgSize * 0.5, 0, 2 * Math.PI, false);
-                                ctx.strokeStyle = highlightNodes.has(node) ? 
-                                    (node === hoverNode ? 'red' : 'orange') : 
+                                ctx.strokeStyle = highlightNodes.has(node) ?
+                                    (node === hoverNode ? 'red' : 'orange') :
                                     (node.borderColor || '#333');
                                 ctx.lineWidth = highlightNodes.has(node) ? 3 : 1;
                                 ctx.stroke();

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>GitHub Network Graph 2D</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body>
+    <div id="graph"></div>
+
+    <script>
+        fetch('graph-data.json')
+            .then(res => res.json())
+            .then(data => {
+                const graphData = data;
+
+                // Build neighbors and links references for highlighting
+                graphData.links.forEach(link => {
+                    const a = graphData.nodes.find(n => n.id === (link.source.id || link.source));
+                    const b = graphData.nodes.find(n => n.id === (link.target.id || link.target));
+                    if (a && b) {
+                        a.neighbors = a.neighbors || [];
+                        b.neighbors = b.neighbors || [];
+                        a.neighbors.push(b);
+                        b.neighbors.push(a);
+
+                        a.links = a.links || [];
+                        b.links = b.links || [];
+                        a.links.push(link);
+                        b.links.push(link);
+                    }
+                });
+
+                const highlightNodes = new Set();
+                const highlightLinks = new Set();
+                let hoverNode = null;
+
+                const Graph = ForceGraph()(document.getElementById('graph'))
+                    .graphData(graphData)
+                    .d3Force('link', d3.forceLink().distance(150))
+                    .d3Force('charge', d3.forceManyBody().strength(-100))
+                    .d3Force('center', d3.forceCenter())
+                    .nodeId('id')
+                    .nodeCanvasObject((node, ctx, globalScale) => {
+                        const label = node.id;
+                        const nodeSize = node.size || 5; // smaller size for better perf
+
+                        // Highlight ring
+                        if (highlightNodes.has(node)) {
+                            ctx.beginPath();
+                            ctx.arc(node.x, node.y, nodeSize * 1.2, 0, 2 * Math.PI);
+                            ctx.fillStyle = node === hoverNode ? 'red' : 'orange';
+                            ctx.fill();
+                        }
+
+                        // Draw simple circle node
+                        ctx.beginPath();
+                        ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
+                        ctx.fillStyle = node.color || 'skyblue';
+                        ctx.fill();
+
+                        // Draw node label with opacity fading on zoom
+                        const baseFontSize = 12;
+                        const fontSize = Math.max(baseFontSize / globalScale, 4);
+                        let opacity = Math.min(globalScale, 1);
+                        if (opacity < 0.5) opacity = 0;
+
+                        ctx.font = `${fontSize}px Sans-Serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
+                        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+                        ctx.fillText(label, node.x, node.y + nodeSize + 2);
+                    })
+                    .nodePointerAreaPaint((node, color, ctx) => {
+                        const nodeSize = node.size || 5;
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
+                        ctx.fill();
+                    })
+                    .nodeLabel(node => typeof node.name === 'string' && node.name.trim().length > 1 ? node.name : node.id)
+                    .nodeVal(node => node.size || 1)
+                    .nodeAutoColorBy('depth')
+                    .linkSource('source')
+                    .linkTarget('target')
+                    .linkWidth(link => highlightLinks.has(link) ? 3 : 1)
+                    .onNodeHover(node => {
+                        highlightNodes.clear();
+                        highlightLinks.clear();
+                        if (node) {
+                            highlightNodes.add(node);
+                            node.neighbors?.forEach(n => highlightNodes.add(n));
+                            node.links?.forEach(l => highlightLinks.add(l));
+                        }
+                        hoverNode = node || null;
+                    })
+                    .onLinkHover(link => {
+                        highlightNodes.clear();
+                        highlightLinks.clear();
+                        if (link) {
+                            highlightLinks.add(link);
+                            const sourceNode = graphData.nodes.find(n => n.id === (link.source.id || link.source));
+                            const targetNode = graphData.nodes.find(n => n.id === (link.target.id || link.target));
+                            if (sourceNode) highlightNodes.add(sourceNode);
+                            if (targetNode) highlightNodes.add(targetNode);
+                        }
+                    })
+                    .autoPauseRedraw(false)
+                    .onNodeClick(node => {
+                        if (node.url) window.open(node.url, '_blank');
+                    })
+                    .onNodeRightClick((node, event) => {
+                        event.preventDefault?.();
+
+                        const toRemove = new Set();
+                        const visited = new Set();
+
+                        function dfs(currentId) {
+                            if (visited.has(currentId)) return;
+                            visited.add(currentId);
+                            toRemove.add(currentId);
+
+                            graphData.links.forEach(link => {
+                                if (link.source.id === currentId || link.source === currentId) {
+                                    dfs(link.target.id || link.target);
+                                }
+                            });
+                        }
+
+                        dfs(node.id);
+
+                        graphData.nodes = graphData.nodes.filter(n => !toRemove.has(n.id));
+                        graphData.links = graphData.links.filter(l =>
+                            !toRemove.has(l.source?.id || l.source) && !toRemove.has(l.target?.id || l.target)
+                        );
+
+                        Graph.graphData({
+                            nodes: [...graphData.nodes],
+                            links: [...graphData.links]
+                        });
+                    });
+            });
+    </script>
+</body>
+
+</html>

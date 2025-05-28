@@ -4,16 +4,14 @@ This project visualizes a GitHub user's social coding network in interactive 2D 
 
 ## Features
 
-* **2D and 3D visualizations** of GitHub user networks
-* **Clickable nodes** linking to GitHub profiles
-* **Right-click to remove** a node and its downstream connections
-* **Image support** for node avatars
-* **Interactive highlighting** of linked nodes and edges
-* **Jupyter Notebook** to generate graph data by scraping GitHub starting from a specified user
+* Interactive **2D and 3D visualizations** of GitHub user networks
+* Clickable nodes linking to GitHub profiles
+* Right-click to remove a node and its downstream connections
+* Node avatars with **image support** (recommended for \~300 nodes max for performance)
+* Highlighting of connected nodes and links
+* Jupyter Notebook to scrape and generate graph data starting from a specified user
 
 ## Live Demo
-
-A live version of the visualizations is available via GitHub Pages:
 
 [https://catalinplesu.github.io/github-connections-graph/](https://catalinplesu.github.io/github-connections-graph/)
 
@@ -28,39 +26,39 @@ cd github-network-graph
 
 ### 2. Run a Local Server
 
-These HTML files require a server environment to load the `graph-data.json`. Run the following command in the project root:
+The HTML files require a server to load `graph-data.json`:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then navigate to:
+Access the visualizations at:
 
-* [http://localhost:8000/2d.html](http://localhost:8000/2d.html) – 2D Graph
-* [http://localhost:8000/3d.html](http://localhost:8000/3d.html) – 3D Graph
+* [http://localhost:8000/2d.html](http://localhost:8000/2d.html) – 2D Graph (with images)
+* [http://localhost:8000/2d-simple.html](http://localhost:8000/2d-simple.html) – 2D Graph (no images, better for large graphs)
+* [http://localhost:8000/3d.html](http://localhost:8000/3d.html) – 3D Graph (with images)
 
-### 3. Generate Data
+### 3. Generate Graph Data
 
-Use the provided Jupyter Notebook to scrape the GitHub network starting from any user.
+Use the included Jupyter Notebook to scrape GitHub starting from any user:
 
 ```python
-# Example usage in notebook
 starting_user = "CatalinPlesu"
-depth = 2  # Number of link levels to follow
+depth = 2  # levels of connections to scrape
 ```
 
-Output is saved as `graph-data.json`, which the HTML visualizations use as input.
+Output is saved as `graph-data.json` for visualization.
 
 ## Dependencies
 
-* `force-graph` (via CDN)
-* `d3.js` (via CDN)
-* Python 3.x for running the local server and the Jupyter Notebook
-* `requests`, `networkx`, and `matplotlib` in the notebook (install via `pip`)
+* `force-graph` and `d3.js` (CDN)
+* Python 3.x
+* Python packages: `requests`, `networkx`, `matplotlib` (install via `pip`)
 
 ## Notes
 
 * Zoom with mouse wheel
 * Left-click a node to open the GitHub profile in a new tab
-* Right-click a node to remove it and its connections
-* The 3D graph may be slow on low-end machines
+* Right-click a node to remove it and its downstream connections
+* **Image-based graphs are recommended for networks of around 300 nodes or fewer to maintain performance**
+* The 3D graph may be slow on low-end hardware

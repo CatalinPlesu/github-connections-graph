@@ -78,6 +78,7 @@
 
                     const Graph = ForceGraph()(document.getElementById('graph'))
                         .graphData(graphData)
+                        .d3Force('link', d3.forceLink().distance(75))
                         .nodeId('id')
                         .nodeCanvasObject((node, ctx, globalScale) => {
                             const label = node.id;

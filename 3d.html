@@ -34,7 +34,7 @@
             MeshBasicMaterial
         } from "https://esm.sh/three";
 
-        fetch('graph-data.json')
+        fetch('graph-data.min.json')
             .then(res => res.json())
             .then(data => {
                 const graphData = JSON.parse(JSON.stringify(data)); // deep clone
